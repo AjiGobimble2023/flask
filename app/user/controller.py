@@ -6,43 +6,52 @@ import pandas as pd
 import mpmath as mp
 import numpy as np
 import statistics
-from openpyxl import load_workbook
 
 
 
 def process_json():
-    request_data = request.get_json()  # Mendapatkan data JSON dari permintaan POST
+    request_data = request.get_json() 
+    list_of_keys = list(request_data.keys())
+    hasil =[]
+    for i in list_of_keys:
+       angka_terakhir = i.split("-")[-1]
+
+        # Konversi angka_terakhir ke tipe data integer jika perlu
+       angka_terakhir = int(angka_terakhir)
+       kodePaket = i.rsplit("-", 1)[0]
+       hasil.append({"hasil":generetNilaiAkhir(request_data[i]),"kode_Paket":kodePaket,"idKelompokUjian":angka_terakhir})
+    return jsonify({"data":hasil})
+   
+def generetNilaiAkhir(request_data):
     sample = []
     noreg =[]
-    yakin =[]
-    nilaicareless = []
     nilaibeda = []
     success_data = []
-
-    for i in range(len(request_data)):
-        sample_isi = []
+    for data in request_data:
         
-        noreg.append(request_data[i][f"c_Internal"])
-        for j in range(len(request_data[0].keys())-1):
+        sample_isi = []
+        noreg.append(data["c_no_register"])
+        for j in range(len(data['c_detil_jawaban'])):
             key = f"c_N{str(j + 1)}"
-            if key in request_data[i]:
-                sampledata = request_data[i][key]
+            if key in data['c_detil_jawaban']:
+                sampledata = data['c_detil_jawaban'][key]
             else:
                 sampledata = '0'
             intdata = int(sampledata)
             sample_isi.append(intdata)
         sample.append(sample_isi)
-         
+        
         num_student = len(sample)
         num_soal = len(sample[0])
        
-        
     for i in range(num_soal):
             # Menghitung jumlah benar tiap nomor
         success_count = sum(sample[i] == 1 for sample in sample)
         success_data.append(success_count)
             # Menghitung tingkat kesulitan tiap soal
     successratio=[(success_data[j]/num_student) for j in range(num_soal)]
+
+  
 
         # Menghitung total jawaban benar untuk setiap siswa
     student_correct_counts = [sum(sample[i]) for i in range(num_student)]
@@ -58,12 +67,13 @@ def process_json():
     correct_answers_bottom_students = [sum(sample[i][j] for i in bottom_students) for j in range(num_soal)]
         # Menghitung daya beda per soal
         
-
     for i in range(num_soal):
         hitung_pa = correct_answers_top_students[i] / selected_students_count
         hitung_pb = correct_answers_bottom_students[i] / selected_students_count
         hitung_beda = (hitung_pa - hitung_pb) if (hitung_pa - hitung_pb) != 0 else 0.01
         nilaibeda.append(hitung_beda)
+        
+   
             
     nilaiguess = 0.2
     awal = [sum(sample[i]) / num_soal for i in range(num_student)]
@@ -106,7 +116,7 @@ def process_json():
         totalarray.append(total_score)
     nilairata = sum(totalarray)/num_student
 
-    nilaiakhir = []
+    hasil = []
     data = np.array(totalarray)
     std =np.std(data)
 
@@ -121,8 +131,7 @@ def process_json():
     
     for i in range(num_student):
         nilaiakhirhitung = 500+(100*(totalarray[i]-nilairata)/std)
-        nilaiakhir.append(nilaiakhirhitung)
+        noregsiswa = noreg[i]
+        hasil.append({'noreg':noregsiswa,'nilai_akhir':nilaiakhirhitung,})
 
-    data = {'noreg': noreg, 'nilai_akhir': nilaiakhir}
-
-    return jsonify({'message': data})
+    return hasil
